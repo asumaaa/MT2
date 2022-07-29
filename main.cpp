@@ -1,30 +1,44 @@
 #include "DxLib.h"
 #include "Vector2.h"
 #include "Vector3.h"
+#include "Matrix4.h"
 #include "cmath"
+#include "cstring"
 
 //関数
 //球の描画
 int DrawSphere3D(const Vector3& CenterPos,const float r,const int DivNum,
 	const unsigned int DifColor,const unsigned int SpcColor,const int FillFlag);
 
+//円錐の描画
+int DrawCone3D(const Vector3& TopPos, const Vector3& BottomPos, const float r, const int DivNum,
+	const unsigned int DifColor, const unsigned int SpcColor, const int FillFlag);
+
 //線分の描画
 int DrawLine3D(const Vector3& Pos1, const Vector3& Pos2, const unsigned Color);
 
+//カメラ設定
 int SetCameraPositionAndTargetAndUpVec(
 	const Vector3& cameraPosition,	//カメラの位置
 	const Vector3& cameraTarget,	//カメラの注視点
 	const Vector3& cameraUp	//カメラの上の向き
 );
 
+//モデルの座標変換用行列をセットする
+int MV1SetMatrix(const int MHandle, const Matrix4 Matrix);
+
+//関数プロトタイプ宣言
+void DrawAxis3D(const float length);
+void DrawKeyOperation();
+
 // ウィンドウのタイトルに表示する文字列
 const char TITLE[] = "LE2B_02_アスマ_ショウタ";
 
 // ウィンドウ横幅
-const int WIN_WIDTH = 1024;
+const int WIN_WIDTH = 1600;
 
 // ウィンドウ縦幅
-const int WIN_HEIGHT = 576;
+const int WIN_HEIGHT = 900;
 
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine,
                    _In_ int nCmdShow) {
@@ -56,32 +70,24 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	SetUseZBuffer3D(true);
 	SetWriteZBuffer3D(true);
 
-	//		クリップ面
-	SetCameraNearFar(1.0f, 1000.0f);
-	SetCameraScreenCenter(WIN_WIDTH / 2.0f, WIN_HEIGHT / 2.0f);
-
-	Vector3 cameraPosition(0.0f, 0.0f, -30.0f);
+	Vector3 cameraPosition(50.0f, 50.0f, -400.0f);
 	Vector3 cameraTarget(0.0f, 0.0f, 0.0f);
 	Vector3 cameraUp(0.0f, 1.0f, 0.0f);
+	//		クリップ面
+	SetCameraNearFar(1.0f, 10000.0f);
+	SetCameraScreenCenter(WIN_WIDTH / 2.0f, WIN_HEIGHT / 2.0f);
 	SetCameraPositionAndTargetAndUpVec(cameraPosition, cameraTarget, cameraUp);
 
-	Vector3 A(3, -1, 2);
-	Vector3 B(1,  5,-4);
-	Vector3 C(-1, 7, 6);
+	int model = MV1LoadModel("fighter/fighter.mqo");
 
-	Vector3 AB(B.x - A.x, B.y - A.y, B.z - A.z);
-	Vector3 BC(C.x - B.x, C.y - B.y, C.z - B.z);
-
-	Vector3 n(AB.y * BC.z - AB.z * BC.y, AB.z * BC.x - AB.x * BC.z, AB.x * BC.y - AB.y * BC.x);
-	n.normalize();
+	const float ROT_UINT = 0.01f;
+	float rotX = 0.0f;
+	float rotY = 0.0f;
+	float rotZ = 0.0f;
 	// 画像などのリソースデータの変数宣言と読み込み
 
 
 	// ゲームループで使う変数の宣言
-	Vector2 position(10, 100);
-	Vector2 velocity(+1.0f, +0.5f);
-	Vector3 position(0, 0, 0);
-	Vector3 velocity(0.0f, 0.0f, 0.5f);
 	SetUseZBufferFlag(true);
 	SetWriteZBufferFlag(true);
 
@@ -102,16 +108,37 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 		//---------  ここからプログラムを記述  ----------//
 
 		// 更新処理
-		Vector3 v(cameraTarget.x - cameraPosition.x, cameraTarget.y - cameraPosition.y, cameraTarget.z - cameraPosition.z);
-		v.normalize();
+		if (CheckHitKey(KEY_INPUT_A))rotY += ROT_UINT;
+		if (CheckHitKey(KEY_INPUT_D))rotY -= ROT_UINT;
 
-		unsigned color = GetColor(255, 255, 255);
+		if (CheckHitKey(KEY_INPUT_W))rotX += ROT_UINT;
+		if (CheckHitKey(KEY_INPUT_S))rotX -= ROT_UINT;
 
-		if(v < 0)
+		if (CheckHitKey(KEY_INPUT_E))rotZ += ROT_UINT;
+		if (CheckHitKey(KEY_INPUT_Z))rotZ -= ROT_UINT;
+		//リセット
+		if (CheckHitKey(KEY_INPUT_R))
+		{
+			rotX = rotY = rotZ = 0;
+		}
+
+		//各種変換行列の計算
+		Matrix4 matScale = scale(Vector3(10.0f, 10.0f, 10.0f));
+		Matrix4 matRotX = rotationX(rotX);
+		Matrix4 matRotY = rotationY(rotY);
+		Matrix4 matRotZ = rotationZ(rotZ);
+		Matrix4 matRot = matRotZ * matRotX * matRotY;
+		Matrix4 matTrans = identity();
+		Matrix4 matWorld = matScale * matRot * matTrans;
+
+		MV1SetMatrix(model, matWorld);
 
 		// 描画処理
 		ClearDrawScreen();
-		DrawSphere3D(position,80.0f,32,GetColor(255,0,0),GetColor(255,255,255),true);
+		DrawAxis3D(200.0f);
+		MV1DrawModel(model);
+
+		DrawKeyOperation();
 
 		//---------  ここまでにプログラムを記述  ---------//
 		// (ダブルバッファ)裏面
@@ -142,4 +169,79 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 int DrawCircle(Vector2 vec, int r, unsigned int color)
 {
 	return DrawCircle(static_cast<int>(vec.x), static_cast<int>(vec.y), r, color);
+}
+
+void DrawAxis3D(const float length)
+{
+	DrawLine3D(Vector3(-length, 0, 0), Vector3(+length, 0, 0), GetColor(255,  0, 0));
+	DrawLine3D(Vector3(0, -length, 0), Vector3(0, +length, 0), GetColor(  0,255, 0));
+	DrawLine3D(Vector3(0, 0, -length), Vector3(0, 0, +length), GetColor(  0,  0,255));
+
+	const float coneSize = 10.0f;
+	DrawCone3D(Vector3(length, 0, 0), Vector3(length - coneSize, 0, 0), coneSize / 2, 16,
+		GetColor(255,   0,   0), GetColor(255, 255, 255), true);
+	DrawCone3D(Vector3(0, length, 0), Vector3(0, length - coneSize, 0), coneSize / 2, 16,
+		GetColor(  0, 255,   0), GetColor(255, 255, 255), true);
+	DrawCone3D(Vector3(0, 0, length), Vector3(0, 0, length - coneSize), coneSize / 2, 16,
+		GetColor(  0,   0, 255), GetColor(255, 255, 255), true);
+}
+void DrawKeyOperation()
+{
+	const unsigned white = GetColor(255, 255, 255);
+
+	DrawFormatString(10, 20 * 1, white, "[W][E][R] R : リセット");
+	DrawFormatString(10, 20 * 2, white, "[A][S][D] AD y軸周りの回転");
+	DrawFormatString(10, 20 * 3, white, "　　[Z]    WS x軸周りの回転");
+	DrawFormatString(10, 20 * 4, white, "		   EZ z軸周りの回転");
+}
+
+
+//球の描画
+int DrawSphere3D(const Vector3& CenterPos, const float r, const int DivNum,
+	const unsigned int DifColor, const unsigned int SpcColor, const int FillFlag)
+{
+	VECTOR centerPos = { CenterPos.x,CenterPos.y,CenterPos.z };
+	return DrawSphere3D(centerPos, r, DivNum, DifColor, SpcColor, FillFlag);
+}
+
+//円錐の描画
+int DrawCone3D(const Vector3& TopPos, const Vector3& BottomPos, const float r, const int DivNum,
+	const unsigned int DifColor, const unsigned int SpcColor, const int FillFlag)
+{
+	VECTOR topPos = { TopPos.x,TopPos.y,TopPos.z };
+	VECTOR bottomPos = { BottomPos.x,BottomPos.y,BottomPos.z };
+
+	return DrawCone3D(topPos, bottomPos, r, DivNum, DifColor, SpcColor, FillFlag);
+}
+
+//線分の描画
+int DrawLine3D(const Vector3& Pos1, const Vector3& Pos2, const unsigned Color)
+{
+	VECTOR p1 = { Pos1.x,Pos1.y ,Pos1.z };
+	VECTOR p2 = { Pos2.x,Pos2.y ,Pos2.z };
+
+	return  DrawLine3D(p1, p2, Color);
+}
+
+//カメラ設定
+int SetCameraPositionAndTargetAndUpVec(
+	const Vector3& cameraPosition,	//カメラの位置
+	const Vector3& cameraTarget,	//カメラの注視点
+	const Vector3& cameraUp	//カメラの上の向き
+)
+{
+	VECTOR position = { cameraPosition.x ,cameraPosition.y ,cameraPosition.z };
+	VECTOR target = { cameraTarget.x ,cameraTarget.y ,cameraTarget.z };
+	VECTOR up = { cameraUp.x ,cameraUp.y ,cameraUp.z };
+
+	return SetCameraPositionAndTargetAndUpVec(position, target, up);
+}
+
+//モデルの座標変換用行列をセットする
+int MV1SetMatrix(const int MHandle, const Matrix4 Matrix)
+{
+	MATRIX matrix;
+	std::memcpy(&matrix, &Matrix, sizeof MATRIX);
+
+	return MV1SetMatrix(MHandle, matrix);
 }
