@@ -35,10 +35,10 @@ void DrawKeyOperation();
 const char TITLE[] = "LE2B_02_アスマ_ショウタ";
 
 // ウィンドウ横幅
-const int WIN_WIDTH = 1600;
+const int WIN_WIDTH = 1024;
 
 // ウィンドウ縦幅
-const int WIN_HEIGHT = 900;
+const int WIN_HEIGHT = 576;
 
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine,
                    _In_ int nCmdShow) {
@@ -70,21 +70,22 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	SetUseZBuffer3D(true);
 	SetWriteZBuffer3D(true);
 
-	Vector3 cameraPosition(50.0f, 50.0f, -400.0f);
+	Vector3 cameraPosition(0.0f, 10.0f, 30.0f);
 	Vector3 cameraTarget(0.0f, 0.0f, 0.0f);
 	Vector3 cameraUp(0.0f, 1.0f, 0.0f);
 	//		クリップ面
-	SetCameraNearFar(1.0f, 10000.0f);
+	SetCameraNearFar(1.0f, 1000.0f);
 	SetCameraScreenCenter(WIN_WIDTH / 2.0f, WIN_HEIGHT / 2.0f);
 	SetCameraPositionAndTargetAndUpVec(cameraPosition, cameraTarget, cameraUp);
 
-	int model = MV1LoadModel("fighter/fighter.mqo");
+	Vector3 A( 3, -1, 2);
+	Vector3 B( 1,  5,-4);
+	Vector3 C(-1,  7, 6);
 
-	const float ROT_UINT = 0.01f;
-	float rotX = 0.0f;
-	float rotY = 0.0f;
-	float rotZ = 0.0f;
-	// 画像などのリソースデータの変数宣言と読み込み
+	Vector3 AB = B - A;
+	Vector3 BC = C - B;
+	Vector3 n = AB.cross(BC);
+	n.normalize();
 
 
 	// ゲームループで使う変数の宣言
@@ -108,37 +109,26 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 		//---------  ここからプログラムを記述  ----------//
 
 		// 更新処理
-		if (CheckHitKey(KEY_INPUT_A))rotY += ROT_UINT;
-		if (CheckHitKey(KEY_INPUT_D))rotY -= ROT_UINT;
+		Vector3 v = cameraPosition - cameraTarget;
+		v.normalize();
 
-		if (CheckHitKey(KEY_INPUT_W))rotX += ROT_UINT;
-		if (CheckHitKey(KEY_INPUT_S))rotX -= ROT_UINT;
+		unsigned color = GetColor(255, 255, 255);
 
-		if (CheckHitKey(KEY_INPUT_E))rotZ += ROT_UINT;
-		if (CheckHitKey(KEY_INPUT_Z))rotZ -= ROT_UINT;
-		//リセット
-		if (CheckHitKey(KEY_INPUT_R))
+		if (v.dot(n) < 0)
 		{
-			rotX = rotY = rotZ = 0;
+			color = GetColor(255, 0, 0);
 		}
-
-		//各種変換行列の計算
-		Matrix4 matScale = scale(Vector3(10.0f, 10.0f, 10.0f));
-		Matrix4 matRotX = rotationX(rotX);
-		Matrix4 matRotY = rotationY(rotY);
-		Matrix4 matRotZ = rotationZ(rotZ);
-		Matrix4 matRot = matRotZ * matRotX * matRotY;
-		Matrix4 matTrans = identity();
-		Matrix4 matWorld = matScale * matRot * matTrans;
-
-		MV1SetMatrix(model, matWorld);
 
 		// 描画処理
 		ClearDrawScreen();
-		DrawAxis3D(200.0f);
-		MV1DrawModel(model);
 
-		DrawKeyOperation();
+		DrawLine3D(A, B, color);
+		DrawLine3D(B, C, color);
+		DrawLine3D(C, A, color);
+
+		DrawLine3D(A, A + n, GetColor(0,255,0));
+		DrawLine3D(B, B + n, GetColor(0, 255, 0));
+		DrawLine3D(C, C + n, GetColor(0, 255, 0));
 
 		//---------  ここまでにプログラムを記述  ---------//
 		// (ダブルバッファ)裏面
